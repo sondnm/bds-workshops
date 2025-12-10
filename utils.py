@@ -38,11 +38,15 @@ class BirdeyeDataServices:
             'Content-Type': 'application/json'
         }
 
-    def _make_request(self, endpoint, params=None):
+    def _make_request(self, endpoint, params=None, method="GET"):
         """Make HTTP request to Birdeye Data Services API"""
         url = f"{self.base_url}{endpoint}"
         try:
-            response = requests.get(url, headers=self.headers, params=params)
+            response = None
+            if method == "POST":
+                response = requests.post(url, headers=self.headers, json=params)
+            else:
+                response = requests.get(url, headers=self.headers, params=params)
             response.raise_for_status()
             return response.json()
         except requests.exceptions.RequestException as e:
@@ -106,6 +110,31 @@ class BirdeyeDataServices:
         """Get detailed breakdown of wallet holdings"""
         return self._make_request("/wallet/v2/net-worth-details", {"wallet": wallet_address, "time": time, "type": type})
     
+    def get_wallet_pnl_summary(self, wallet_address, duration="all"):
+        """Get wallet PnL summary
+
+        Args:
+            wallet_address: Solana wallet address
+            duration: Time period - 'all', '90d', '30d', '7d', '24h'
+        """
+        return self._make_request(
+            "/wallet/v2/pnl/summary", {"wallet": wallet_address, "duration": duration}
+        )
+
+    def get_wallet_pnl_details(self, wallet_address, limit=20, offset=0):
+        """Get wallet PnL details per token
+
+        Args:
+            wallet_address: Solana wallet address
+            limit: Number of tokens to return (default: 20)
+            offset: Pagination offset (default: 0)
+        """
+        return self._make_request(
+            "/wallet/v2/pnl/details",
+            {"wallet": wallet_address, "limit": limit, "offset": offset},
+            "POST",
+        )
+
     def get_ohlcv_data(self, address, type_="1D", time_from=None, time_to=None):
         """Get OHLCV candlestick data"""
         params = {
