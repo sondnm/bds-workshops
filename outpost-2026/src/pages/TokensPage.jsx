@@ -75,6 +75,7 @@ export default function TokensPage() {
   const { apiKey } = useApiKey();
   const [tokens, setTokens] = useState([]);
   const [totalTokens, setTotalTokens] = useState(0);
+  const [hasNext, setHasNext] = useState(false);
   const [serverMode, setServerMode] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -100,7 +101,7 @@ export default function TokensPage() {
       }
 
       try {
-        const { tokens: list, total } = await getTokenList({
+        const { tokens: list, total, hasNext: nextPage } = await getTokenList({
           limit: pageSize,
           offset: (page - 1) * pageSize,
           sortBy,
@@ -109,7 +110,8 @@ export default function TokensPage() {
         });
         if (active) {
           setTokens(list);
-          setTotalTokens(total || list.length);
+          setTotalTokens(Number.isFinite(total) ? total : null);
+          setHasNext(Boolean(nextPage));
           setServerMode(true);
           setLoading(false);
         }
@@ -117,6 +119,7 @@ export default function TokensPage() {
         if (active) {
           setTokens(seedTokens);
           setTotalTokens(seedTokens.length);
+          setHasNext(false);
           setServerMode(false);
           const message =
             err && err.message ? `Unable to load Birdeye token list: ${err.message}` : "Unable to load Birdeye token list.";
@@ -161,8 +164,20 @@ export default function TokensPage() {
     });
   }, [filteredTokens, sortBy, sortType, serverMode]);
 
-  const totalCount = serverMode ? totalTokens : sortedTokens.length;
-  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const totalCountLabel = serverMode
+    ? Number.isFinite(totalTokens)
+      ? totalTokens
+      : hasNext
+        ? `${page * pageSize}+`
+        : `${page * pageSize}`
+    : sortedTokens.length;
+  const totalPages = serverMode
+    ? Number.isFinite(totalTokens)
+      ? Math.max(1, Math.ceil(totalTokens / pageSize))
+      : hasNext
+        ? page + 1
+        : page
+    : Math.max(1, Math.ceil(sortedTokens.length / pageSize));
   const pageStart = (page - 1) * pageSize;
   const pageItems = serverMode ? sortedTokens : sortedTokens.slice(pageStart, pageStart + pageSize);
 
@@ -184,7 +199,7 @@ export default function TokensPage() {
             <div className="muted">Live prices, liquidity, and momentum on Solana</div>
           </div>
           <div className="toolbar">
-            <span className="pill">{totalCount} tokens</span>
+            <span className="pill">{totalCountLabel} tokens</span>
             <input
               type="search"
               placeholder="Search token or address"

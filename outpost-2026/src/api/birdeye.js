@@ -273,8 +273,6 @@ export async function getTokenList({
     sort_type: sortType,
     limit,
     offset,
-    page: Math.floor(offset / limit) + 1,
-    page_size: limit,
   };
 
   Object.entries(TOKEN_LIST_FILTER_MAP).forEach(([key, param]) => {
@@ -285,13 +283,20 @@ export async function getTokenList({
 
   const data = await fetchBirdeye(ENDPOINTS.tokenList, params);
   const list = data?.data?.tokens || data?.data?.items || data?.data || [];
-  const total =
-    data?.data?.total ||
-    data?.data?.totalCount ||
-    data?.data?.count ||
-    data?.data?.total_count ||
-    list.length;
-  return { tokens: list.map(normalizeToken).filter(Boolean), total };
+  const rawTotal =
+    data?.data?.total ??
+    data?.data?.totalCount ??
+    data?.data?.count ??
+    data?.data?.total_count;
+  const total = Number.isFinite(Number(rawTotal)) ? Number(rawTotal) : null;
+  const apiHasNext = data?.data?.hasNext;
+  const hasNext =
+    typeof apiHasNext === "boolean"
+      ? apiHasNext
+      : total !== null
+        ? offset * limit + list.length < total
+        : list.length === limit;
+  return { tokens: list.map(normalizeToken).filter(Boolean), total, hasNext };
 }
 
 export async function getTokenOverview(address) {
