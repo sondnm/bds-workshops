@@ -2,6 +2,7 @@ export default function Pagination({
   page,
   totalPages,
   pageSize,
+  onFirst,
   onPrev,
   onNext,
   onPageSize,
@@ -20,6 +21,9 @@ export default function Pagination({
             <option value={50}>50</option>
           </select>
         </label>
+        <button className="btn btn-ghost" onClick={onFirst} disabled={page <= 1}>
+          First
+        </button>
         <button className="btn btn-ghost" onClick={onPrev} disabled={page <= 1}>
           Prev
         </button>

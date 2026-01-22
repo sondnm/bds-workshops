@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import {
   getWalletBalanceChange,
   getWalletNetWorth,
+  getWalletNetWorthChart,
   getWalletPnlDetails,
   getWalletPnlSummary,
   getWalletTransfers,
@@ -42,11 +43,11 @@ const EMPTY_WALLET = {
   holdings: [],
   transfers: [],
   balanceChanges: [],
-  balanceHistory: [],
+  netWorthHistory: [],
   pnlDetails: {},
 };
 
-function normalizeWallet(summary, details, netWorth, transfers, balanceChange) {
+function normalizeWallet(summary, details, netWorth, netWorthChart, transfers, balanceChange) {
   const summaryData = summary?.summary || summary?.data?.summary || summary?.data || summary || {};
   const detailSummary = details?.summary || details?.data?.summary || {};
   const netWorthData = netWorth?.data || netWorth || {};
@@ -175,46 +176,20 @@ function normalizeWallet(summary, details, netWorth, transfers, balanceChange) {
     };
   });
 
-  const historySource =
-    balanceChange.history ||
-    balanceChange.data?.history ||
-    balanceChange.items ||
-    balanceChange.data?.items ||
-    balanceChange.changes ||
-    [];
-  const historyCandidates = Array.isArray(historySource) ? historySource : [];
-  const historyFallbackStart = Date.now() - Math.max(0, historyCandidates.length - 1) * 3600 * 1000;
-  const balanceHistory = historyCandidates
-    .map((item, index) => {
-      const time =
-        normalizeTimestamp(
-          item.time,
-          item.timestamp,
-          item.unixTime,
-          item.unix_time,
-          item.block_time,
-          item.blockTime,
-          item.created_at,
-          item.createdAt,
-          item.date,
-          item.timepoint,
-          item.start_time,
-          item.end_time,
-        ) ?? historyFallbackStart + index * 3600 * 1000;
-      const value = pickFirstNumber(
-        item.balance,
-        item.value,
-        item.netWorth,
-        item.net_worth,
-        item.amount,
-        item.delta,
-        item.change,
-        item.balance_change,
-        item.balanceChange,
-        item.usdChange,
-        item.change_usd,
+  const netWorthSource = netWorthChart?.history || netWorthChart?.data?.history || [];
+  const netWorthCandidates = Array.isArray(netWorthSource) ? netWorthSource : [];
+  const netWorthHistory = netWorthCandidates
+    .map((item) => {
+      const time = normalizeTimestamp(
+        item.timestamp,
+        item.time,
+        item.unixTime,
+        item.unix_time,
+        item.date,
+        item.timepoint,
       );
-      if (value === null || value === undefined) return null;
+      const value = pickFirstNumber(item.net_worth, item.netWorth, item.value, item.balance);
+      if (!time || value === null || value === undefined) return null;
       return { time, value: Number(value) };
     })
     .filter(Boolean)
@@ -270,7 +245,7 @@ function normalizeWallet(summary, details, netWorth, transfers, balanceChange) {
     holdings,
     transfers: transferItems,
     balanceChanges,
-    balanceHistory,
+    netWorthHistory,
     pnlDetails: details?.data || details || {},
   };
 }
@@ -299,14 +274,15 @@ export default function WalletPage() {
 
     setLoading(true);
     try {
-      const [summary, details, netWorth, transfers, balanceChange] = await Promise.all([
+      const [summary, details, netWorth, netWorthChart, transfers, balanceChange] = await Promise.all([
         getWalletPnlSummary(trimmed),
         getWalletPnlDetails(trimmed, { limit: 25 }),
         getWalletNetWorth(trimmed),
+        getWalletNetWorthChart(trimmed, { count: 30, type: "1d", direction: "back", sortType: "asc" }),
         getWalletTransfers(trimmed, 8),
         getWalletBalanceChange(trimmed),
       ]);
-      setWalletData(normalizeWallet(summary, details, netWorth, transfers, balanceChange));
+      setWalletData(normalizeWallet(summary, details, netWorth, netWorthChart, transfers, balanceChange));
       setStatus("live");
     } catch (err) {
       setWalletData(EMPTY_WALLET);
@@ -410,10 +386,10 @@ export default function WalletPage() {
         </div>
         <div className="card">
           <div className="card-header">
-            <div className="card-title">Balance change chart</div>
+            <div className="card-title">Net worth chart</div>
           </div>
           <div className="chart-wrapper">
-            <LineChart points={walletData.balanceHistory} />
+            <LineChart points={walletData.netWorthHistory} />
           </div>
         </div>
         <div className="card">

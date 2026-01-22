@@ -232,6 +232,7 @@ export default function TokensPage() {
           page={page}
           totalPages={totalPages}
           pageSize={pageSize}
+          onFirst={() => setPage(1)}
           onPrev={() => setPage((prev) => Math.max(1, prev - 1))}
           onNext={() => setPage((prev) => Math.min(totalPages, prev + 1))}
           onPageSize={(value) => setPageSize(Number(value))}

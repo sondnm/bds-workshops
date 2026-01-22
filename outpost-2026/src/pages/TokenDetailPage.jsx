@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import {
   getOhlcv,
+  getTokenHolderDistribution,
   getTokenOverview,
   getTokenTxs,
   normalizeTokenTx,
@@ -11,7 +12,7 @@ import TransactionTable from "../components/TransactionTable";
 import { generateCandles, generateTransactions, seedTokens } from "../data/mock";
 import { useApiKey } from "../hooks/useApiKey";
 import { useRealtimeToken } from "../hooks/useRealtimeToken";
-import { formatMoney, formatPct } from "../utils/format";
+import { formatAmount, formatMoney, formatPct, shortAddress } from "../utils/format";
 
 const INTERVALS = [
   { label: "1H", key: "change1h", volumeFactor: 0.02 },
@@ -30,7 +31,14 @@ const INTERVAL_SECONDS = {
   "1D": 86400,
 };
 
+function formatSupplyPercent(value) {
+  if (value === null || value === undefined || Number.isNaN(value)) return "-";
+  const percent = value <= 1 ? value * 100 : value;
+  return `${percent.toFixed(2)}%`;
+}
+
 export default function TokenDetailPage() {
+  const [showAllHolders, setShowAllHolders] = useState(false);
   const [candleInterval, setCandleInterval] = useState("1H");
   const { address } = useParams();
   const { apiKey } = useApiKey();
@@ -42,6 +50,7 @@ export default function TokenDetailPage() {
   const [token, setToken] = useState(fallbackToken);
   const [candles, setCandles] = useState(generateCandles(36, fallbackToken.price));
   const [txs, setTxs] = useState(generateTransactions());
+  const [holderDistribution, setHolderDistribution] = useState({ holders: [], summary: null });
   const [status, setStatus] = useState("mock");
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
 
@@ -53,12 +62,13 @@ export default function TokenDetailPage() {
         setToken(fallbackToken);
         setCandles(generateCandles(36, fallbackToken.price));
         setTxs(generateTransactions());
+        setHolderDistribution({ holders: [], summary: null });
         setStatus("mock");
         return;
       }
 
       try {
-        const [tokenData, candleData, txData] = await Promise.all([
+        const [tokenData, candleData, txData, holderData] = await Promise.all([
           getTokenOverview(activeAddress),
           getOhlcv({
             address: activeAddress,
@@ -66,18 +76,26 @@ export default function TokenDetailPage() {
             countLimit: MAX_CANDLES,
           }),
           getTokenTxs({ address: activeAddress, limit: 12 }),
+          getTokenHolderDistribution(activeAddress, {
+            mode: "top",
+            topN: 10,
+            includeList: true,
+            limit: 10,
+          }),
         ]);
         if (!active) return;
         setToken({ ...fallbackToken, ...(tokenData || {}) });
         const trimmedCandles = candleData.length ? candleData.slice(-MAX_CANDLES) : [];
         setCandles(trimmedCandles.length ? trimmedCandles : generateCandles(36, tokenData?.price || 120));
         setTxs(txData.length ? txData : generateTransactions());
+        setHolderDistribution(holderData || { holders: [], summary: null });
         setStatus("live");
       } catch (err) {
         if (!active) return;
         setToken(fallbackToken);
         setCandles(generateCandles(36, fallbackToken.price));
         setTxs(generateTransactions());
+        setHolderDistribution({ holders: [], summary: null });
         setStatus("mock");
       }
     }
@@ -87,6 +105,10 @@ export default function TokenDetailPage() {
       active = false;
     };
   }, [activeAddress, apiKey, fallbackToken, candleInterval]);
+
+  useEffect(() => {
+    setShowAllHolders(false);
+  }, [activeAddress]);
 
   const mockStream = useCallback(() => {
     const interval = setInterval(() => {
@@ -293,7 +315,7 @@ export default function TokenDetailPage() {
         </div>
       </div>
 
-      <div className="grid grid-2 section">
+      <div className="grid grid-3 section">
         <div className="card">
           <div className="card-header">
             <div>
@@ -345,6 +367,50 @@ export default function TokenDetailPage() {
               <strong>Solana</strong>
             </div>
           </div>
+        </div>
+
+        <div className="card">
+          <div className="card-header">
+            <div>
+              <div className="card-title">Top holder distribution</div>
+              <div className="muted">Share of total supply</div>
+            </div>
+          </div>
+          {holderDistribution.holders.length ? (
+            <div className="list list-compact list-plain">
+              {holderDistribution.holders
+                .slice(0, showAllHolders ? 10 : 5)
+                .map((holder) => (
+                  <div className="list-item" key={holder.wallet || holder.tokenAccount}>
+                    <div>
+                      <div className="mono">
+                        {holder.wallet ? (
+                          <Link to={`/wallet?wallet=${encodeURIComponent(holder.wallet)}`}>
+                            {shortAddress(holder.wallet)}
+                          </Link>
+                        ) : (
+                          "Unknown"
+                        )}
+                      </div>
+                    </div>
+                    <div className="right">
+                      <div className="mono">{formatSupplyPercent(holder.percentOfSupply)}</div>
+                    </div>
+                  </div>
+                ))}
+              {holderDistribution.holders.length > 5 ? (
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-compact"
+                  onClick={() => setShowAllHolders((prev) => !prev)}
+                >
+                  {showAllHolders ? "Show less" : "Show more"}
+                </button>
+              ) : null}
+            </div>
+          ) : (
+            <div className="empty-state">No holders loaded.</div>
+          )}
         </div>
       </div>
 

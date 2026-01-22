@@ -9,9 +9,11 @@ export const ENDPOINTS = {
   tokenOverview: "/defi/token_overview",
   ohlcv: "/defi/v3/ohlcv",
   tokenTxs: "/defi/v3/token/txs",
+  tokenHolderDistribution: "/holder/v1/distribution",
   walletPnlSummary: "/wallet/v2/pnl/summary",
   walletPnlDetails: "/wallet/v2/pnl/details",
   walletNetWorth: "/wallet/v2/current-net-worth",
+  walletNetWorthChart: "/wallet/v2/net-worth",
   walletTransfers: "/wallet/v2/transfer",
   walletBalanceChange: "/wallet/v2/balance-change",
 };
@@ -261,6 +263,33 @@ export function normalizeTokenTx(raw) {
   };
 }
 
+export function normalizeTokenHolder(raw) {
+  if (!raw) return null;
+  const decimals = Number(raw.decimals ?? 0);
+  const uiAmount =
+    raw.ui_amount ??
+    raw.uiAmount ??
+    (raw.amount !== undefined && decimals
+      ? Number(raw.amount) / 10 ** decimals
+      : Number(raw.amount ?? 0));
+  return {
+    owner: raw.owner || raw.wallet || "",
+    tokenAccount: raw.token_account || raw.tokenAccount || "",
+    uiAmount: Number(uiAmount) || 0,
+    decimals,
+  };
+}
+
+export function normalizeHolderDistribution(raw) {
+  if (!raw) return null;
+  const percentRaw = raw.percent_of_supply ?? raw.percentOfSupply ?? 0;
+  return {
+    wallet: raw.wallet || raw.owner || "",
+    holding: Number(raw.holding ?? raw.amount ?? 0),
+    percentOfSupply: Number(percentRaw) || 0,
+  };
+}
+
 export async function getTokenList({
   limit = 20,
   offset = 0,
@@ -297,6 +326,22 @@ export async function getTokenList({
         ? offset * limit + list.length < total
         : list.length === limit;
   return { tokens: list.map(normalizeToken).filter(Boolean), total, hasNext };
+}
+
+export async function getTokenHolderDistribution(
+  tokenAddress,
+  { mode = "top", topN = 10, includeList = true, uiAmountMode = "scaled" } = {},
+) {
+  const data = await fetchBirdeye(ENDPOINTS.tokenHolderDistribution, {
+    token_address: tokenAddress,
+    mode,
+    top_n: topN,
+    include_list: includeList,
+    ui_amount_mode: uiAmountMode,
+  });
+  const payload = data?.data || data || {};
+  const holders = (payload.holders || []).map(normalizeHolderDistribution).filter(Boolean);
+  return { summary: payload.summary || {}, holders };
 }
 
 export async function getTokenOverview(address) {
@@ -354,6 +399,22 @@ export async function getWalletPnlDetails(wallet, { limit = 20, offset = 0 } = {
 
 export async function getWalletNetWorth(wallet) {
   const data = await fetchBirdeye(ENDPOINTS.walletNetWorth, { wallet });
+  return data?.data || data || {};
+}
+
+export async function getWalletNetWorthChart(
+  wallet,
+  { count = 14, type = "1d", direction = "back", time, sortType = "asc" } = {},
+) {
+  const params = {
+    wallet,
+    count,
+    type,
+    direction,
+    sort_type: sortType,
+  };
+  if (time) params.time = time;
+  const data = await fetchBirdeye(ENDPOINTS.walletNetWorthChart, params);
   return data?.data || data || {};
 }
 

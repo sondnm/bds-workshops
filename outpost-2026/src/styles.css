@@ -170,6 +170,16 @@ a {
   transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 
+.btn-compact {
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.list.list-plain .btn-compact {
+  justify-self: start;
+  margin-top: 4px;
+}
+
 .btn-primary {
   background: var(--primary);
   color: #fff;
@@ -410,6 +420,11 @@ select:focus-visible {
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
 }
 
+.metric-grid.metric-grid-compact {
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  margin-bottom: 12px;
+}
+
 .metric-card {
   border-radius: 14px;
   background: var(--surface-muted);
@@ -537,6 +552,21 @@ canvas {
   border-radius: 12px;
   background: var(--surface-muted-strong);
   border: 1px solid var(--surface-muted-border);
+}
+
+.list.list-compact {
+  gap: 8px;
+}
+
+.list.list-compact .list-item {
+  padding: 8px 10px;
+}
+
+.list.list-plain .list-item {
+  padding: 6px 0;
+  border: none;
+  background: transparent;
+  border-radius: 0;
 }
 
 .list-item span {
