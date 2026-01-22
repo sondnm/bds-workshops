@@ -130,3 +130,4 @@ logs/
 node_modules/
 *.html
 openapi_docs.json
+.codex/
